@@ -1,9 +1,11 @@
+<!DOCTYPE html>
+<html lang="ja">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>✨ 魔法のシフト読み込みくん ✨</title>
     
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/opencv.js/4.5.0/opencv.js" defer></script>
+    <script src="https://unpkg.com/@techstark/opencv-js@4.6.0-release.2/dist/opencv.js" defer></script>
     <script src="https://unpkg.com/tesseract.js@4.0.2/dist/tesseract.min.js"></script>
     
     <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@700&display=swap" rel="stylesheet">
@@ -157,7 +159,6 @@
 
     let isOpenCvReady = false;
 
-    // 安全装置：10秒経っても起動しなかったらエラーを表示する
     const timeoutCheck = setTimeout(() => {
         if (!isOpenCvReady) {
             status.innerHTML = '⚠️ 読み込みが止まっちゃった！ブラウザの再読み込み(F5)を試してみてね。';
@@ -165,7 +166,6 @@
         }
     }, 10000);
 
-    // OpenCVの起動をチェック
     function onOpenCvReady() {
         isOpenCvReady = true;
         clearTimeout(timeoutCheck);
@@ -174,19 +174,17 @@
         status.style.color = '#2ec4b6';
     }
 
-    // OpenCV.jsが正しく読み込まれたら自動で実行される関数
     var Module = {
         onRuntimeInitialized: function() {
             onOpenCvReady();
         }
     };
 
-    // 写真が選択された時の処理
     imageInput.addEventListener('change', async (e) => {
         const file = e.target.files[0];
         if (!file) return;
         if (!isOpenCvReady) {
-            alert('まだ準備中だよ！少し待ってね。');
+            alert('まだ準備中だよ！少し待ね。');
             return;
         }
 
@@ -252,7 +250,6 @@
                 const nameCanvas = document.createElement('canvas');
                 cv.imshow(nameCanvas, nameRoi);
                 
-                // Tesseractの読み込み
                 const worker = await Tesseract.createWorker();
                 await worker.loadLanguage('jpn');
                 await worker.initialize('jpn');
@@ -312,7 +309,7 @@
                 resultTable.style.display = 'table';
                 
                 if(shiftResults.length === 0) {
-                    resultBody.innerHTML = `<tr><td colspan="3">記号がうまく見つからなかったよ。写真を明るくして試してみてね！</td></tr>`;
+                    resultBody.innerHTML = `<tr><td colspan="3">記号が見つかりませんでした。明るい場所で、シートを画面いっぱいに入れて撮ってね！</td></tr>`;
                 } else {
                     shiftResults.forEach(res => {
                         const row = `<tr class="animate__animated animate__fadeInUp">
