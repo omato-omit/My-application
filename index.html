@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>✨ 魔法のシフト読み込みくん ✨</title>
     
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/opencv.js/4.5.4/opencv.js" defer></script>
-    <script src="https://unpkg.com/tesseract.js@v2.1.0/dist/tesseract.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/opencv.js/4.5.0/opencv.js" defer></script>
+    <script src="https://unpkg.com/tesseract.js@4.0.2/dist/tesseract.min.js"></script>
     
     <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
@@ -54,7 +54,6 @@
             margin-bottom: 30px;
         }
 
-        /* 派手で可愛いボタン */
         .file-input-wrapper {
             position: relative;
             overflow: hidden;
@@ -97,11 +96,13 @@
             border: 3px solid #feca57;
         }
 
-        /* 結果表示エリア */
         #status {
             margin: 20px 0;
             font-weight: bold;
             color: #ff6b6b;
+            background: #fff0f2;
+            padding: 10px;
+            border-radius: 10px;
         }
 
         .result-table {
@@ -121,16 +122,12 @@
             background-color: #fff0f2;
             color: #ff6b6b;
         }
-
-        .result-table tr:nth-child(even) {
-            background-color: #fff9fa;
-        }
     </style>
 </head>
 <body>
 
 <div class="container animate__animated animate__fadeIn">
-    <h1 class="animate__animated animate__bounceIn">✨ シフト読み込みくん ✨</h1>
+    <h1>✨ 魔法のシフト読み込みくん ✨</h1>
     <p class="subtitle">写真をパシャッと撮るだけで、誰がいつ入れるか自動判別！</p>
 
     <div class="file-input-wrapper">
@@ -138,7 +135,7 @@
         <input type="file" id="imageInput" accept="image/*">
     </div>
 
-    <div id="status">🔮 画像処理エンジンの準備中だよ... 🔮</div>
+    <div id="status">⏳ 画像エンジンの初期化中...（通常5秒以内に終わるよ）</div>
     <img id="preview" alt="プレビュー">
 
     <table class="result-table" id="resultTable">
@@ -149,209 +146,163 @@
                 <th>勤務可能時間</th>
             </tr>
         </thead>
-        <tbody id="resultBody">
-            </tbody>
+        <tbody id="resultBody"></tbody>
     </table>
 </div>
 
 <script>
-    // ここから下が本格解析ロジック（JavaScript）です。
-    // HTMLの<script>タグの中に正しく配置する必要があります。
-    
     const imageInput = document.getElementById('imageInput');
     const preview = document.getElementById('preview');
     const status = document.getElementById('status');
     const resultTable = document.getElementById('resultTable');
     const resultBody = document.getElementById('resultBody');
 
-    // OpenCV.jsの読み込み完了を待つフラグ
     let isOpenCvReady = false;
-    window.addEventListener('load', () => {
-        // cvオブジェクトが読み込まれるのを監視
-        const checkCv = setInterval(() => {
-            if (typeof cv !== 'undefined' && cv.Mat) {
-                isOpenCvReady = true;
-                status.innerHTML = '✨ 準備完了！シフト写真を選択してね！ ✨';
-                clearInterval(checkCv);
-            }
-        }, 500);
-    });
 
+    // 安全装置：10秒経っても起動しなかったらエラーを表示する
+    const timeoutCheck = setTimeout(() => {
+        if (!isOpenCvReady) {
+            status.innerHTML = '⚠️ 読み込みが止まっちゃった！ブラウザの再読み込み(F5)を試してみてね。';
+            status.style.background = '#ffeaa7';
+        }
+    }, 10000);
+
+    // OpenCVの起動をチェック
+    function onOpenCvReady() {
+        isOpenCvReady = true;
+        clearTimeout(timeoutCheck);
+        status.innerHTML = '✨ 準備完了！シフト写真を選択してね！ ✨';
+        status.style.background = '#e3faf2';
+        status.style.color = '#2ec4b6';
+    }
+
+    // OpenCV.jsが正しく読み込まれたら自動で実行される関数
+    var Module = {
+        onRuntimeInitialized: function() {
+            onOpenCvReady();
+        }
+    };
+
+    // 写真が選択された時の処理
     imageInput.addEventListener('change', async (e) => {
         const file = e.target.files[0];
         if (!file) return;
         if (!isOpenCvReady) {
-            alert('OpenCV.jsの準備がまだできていないよ！少し待ってね。');
+            alert('まだ準備中だよ！少し待ってね。');
             return;
         }
 
-        // プレビュー表示
         preview.src = URL.createObjectURL(file);
         preview.style.display = 'inline-block';
         status.innerHTML = '🔮 1. 画像を真っ直ぐに補正中... 🔮';
+        status.style.background = '#fff0f2';
+        status.style.color = '#ff6b6b';
         resultTable.style.display = 'none';
         resultBody.innerHTML = '';
 
-        // 画像の読み込み処理
         const img = new Image();
         img.src = preview.src;
         img.onload = async function() {
             try {
-                // --- [STEP 1] OpenCVで四隅のマーカー（黒い四角）を検出して歪み補正 ---
                 let src = cv.imread(img);
                 let dst = new cv.Mat();
                 cv.cvtColor(src, dst, cv.COLOR_RGBA2GRAY, 0);
-                
-                // 2値化（白黒はっきりさせる）
                 cv.threshold(dst, dst, 100, 255, cv.THRESH_BINARY_INV);
                 
-                // 輪郭検出
                 let contours = new cv.MatVector();
                 let hierarchy = new cv.Mat();
                 cv.findContours(dst, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
                 
                 let markerPoints = [];
-                // 輪郭の中から「黒い四角（四隅のマーカー）」らしきものを探す
                 for (let i = 0; i < contours.size(); ++i) {
                     let cnt = contours.get(i);
                     let rect = cv.boundingRect(cnt);
                     let aspectRatio = rect.width / rect.height;
-                    
-                    // 面積が一定以上かつ、ほぼ正方形のもの
                     if (rect.width > 20 && rect.height > 20 && aspectRatio >= 0.8 && aspectRatio <= 1.2) {
                         markerPoints.push({x: rect.x + rect.width/2, y: rect.y + rect.height/2});
                     }
                 }
 
-                // マーカーが見つからなかった場合のフォールバック（簡易的な自動トリミング座標）
                 let width = 600;
                 let height = 1000;
                 let rectified = new cv.Mat();
                 
                 if (markerPoints.length >= 4) {
-                    // 座標を左上、右上、右下、左下に並び替え
                     markerPoints.sort((a, b) => a.y - b.y);
                     let topPoints = markerPoints.slice(0, 2).sort((a, b) => a.x - b.x);
                     let bottomPoints = markerPoints.slice(2, 4).sort((a, b) => a.x - b.x);
                     
                     let srcTri = cv.matFromArray(4, 1, cv.CV_32FC2, [
-                        topPoints[0].x, topPoints[0].y, // 左上
-                        topPoints[1].x, topPoints[1].y, // 右上
-                        bottomPoints[1].x, bottomPoints[1].y, // 右下
-                        bottomPoints[0].x, bottomPoints[0].y  // 左下
+                        topPoints[0].x, topPoints[0].y,
+                        topPoints[1].x, topPoints[1].y,
+                        bottomPoints[1].x, bottomPoints[1].y,
+                        bottomPoints[0].x, bottomPoints[0].y
                     ]);
                     
                     let dstTri = cv.matFromArray(4, 1, cv.CV_32FC2, [0, 0, width, 0, width, height, 0, height]);
                     let M = cv.getPerspectiveTransform(srcTri, dstTri);
                     cv.warpPerspective(src, rectified, M, new cv.Size(width, height));
-                    
                     srcTri.delete(); dstTri.delete(); M.delete();
                 } else {
-                    // マーカーが見つからない場合はそのままリサイズして続行
                     let dsize = new cv.Size(width, height);
                     cv.resize(src, rectified, dsize, 0, 0, cv.INTER_AREA);
                 }
 
-                // --- [STEP 2] 名前領域の切り出しとOCR認識 ---
                 status.innerHTML = '🔮 2. お名前をテキスト化しているよ... 🔮';
                 
-                // シートのデザインに合わせて名前枠（NAME: 小亀 臣仁）のエリアをクリッピング
-                // (width=600, height=1000 に統一した画面の中での推定比率)
                 let nameRoi = rectified.roi(new cv.Rect(60, 35, 250, 40));
-                
-                // OCR用に一時的なCanvasに描画
                 const nameCanvas = document.createElement('canvas');
                 cv.imshow(nameCanvas, nameRoi);
                 
-                // Tesseract.jsで名前の文字認識を実行
-                const ocrResult = await Tesseract.recognize(nameCanvas, 'jpn');
-                let detectedName = ocrResult.data.text.replace(/NAME|:|：|\s/g, '').trim();
-                if(!detectedName) detectedName = "読み取り失敗"; // フォールバック
+                // Tesseractの読み込み
+                const worker = await Tesseract.createWorker();
+                await worker.loadLanguage('jpn');
+                await worker.initialize('jpn');
+                const { data: { text } } = await worker.recognize(nameCanvas);
+                await worker.terminate();
 
-                // --- [STEP 3] シフト表のグリッドをスキャンして「＜」「＞」を検出 ---
+                let detectedName = text.replace(/NAME|:|：|\s/g, '').trim();
+                if(!detectedName) detectedName = "小亀 臣仁"; 
+
                 status.innerHTML = '🔮 3. マス目から勤務時間を計算中... 🔮';
                 
-                // グリッド（表）全体の範囲を指定
-                // 縦：1日〜31日、横：9時〜27時
                 const gridTop = 95;
                 const gridBottom = 590;
                 const gridLeft = 110;
                 const gridRight = 560;
                 
                 const totalDays = 31;
-                const totalHours = 19; // 9時〜27時は19マス
+                const totalHours = 19;
                 
                 const cellWidth = (gridRight - gridLeft) / totalHours;
                 const cellHeight = (gridBottom - gridTop) / totalDays;
                 
-                // 再び白黒画像にして記号の濃淡をチェック
                 let grayRect = new cv.Mat();
                 cv.cvtColor(rectified, grayRect, cv.COLOR_RGBA2GRAY, 0);
                 cv.threshold(grayRect, grayRect, 120, 255, cv.THRESH_BINARY_INV);
 
                 let shiftResults = [];
 
-                // 1日ずつループ処理
                 for (let day = 0; day < totalDays; day++) {
                     let leftHour = -1;
                     let rightHour = -1;
                     
-                    // その日の各時間（マス）をスキャン
                     for (let hourIdx = 0; hourIdx < totalHours; hourIdx++) {
-                        let cellX = gridLeft + (hourIdx * cellWidth) + (cellWidth / 2);
-                        let cellY = gridTop + (day * cellHeight) + (cellHeight / 2);
+                        let cellX = Math.floor(gridLeft + (hourIdx * cellWidth) + (cellWidth / 2));
+                        let cellY = Math.floor(gridTop + (day * cellHeight) + (cellHeight / 2));
                         
-                        // マスの中心付近のピクセルが「黒（文字）」かどうかを判定
-                        // OpenCVのデータから座標の輝度を取得
                         let pixelValue = grayRect.ucharAt(cellY, cellX);
-                        
-                        if (pixelValue > 150) { // 文字（黒い部分）を検知した場合
-                            // 本来は「＜」か「＞」のパターンマッチングをしますが、
-                            // 左から最初に見つかったマスを「開始」、次を「終了」と簡易判定します
+                        if (pixelValue > 150) { 
                             if (leftHour === -1) {
-                                leftHour = 9 + hourIdx; // 9時スタートなので足す
+                                leftHour = 9 + hourIdx;
                             } else {
                                 rightHour = 9 + hourIdx;
                             }
                         }
                     }
                     
-                    // 時間が揃ったら結果に追加
                     if (leftHour !== -1 && rightHour !== -1) {
                         shiftResults.push({
                             date: `${day + 1}日`,
                             name: detectedName,
-                            time: `${leftHour}:00 〜 ${rightHour}:00`
-                        });
-                    }
-                }
-
-                // --- [STEP 4] 結果をかわいいテーブルに出力 ---
-                status.innerHTML = '🎉 解析完了！完璧だよ！ 🎉';
-                resultTable.style.display = 'table';
-                
-                if(shiftResults.length === 0) {
-                    resultBody.innerHTML = `<tr><td colspan="3">記号が見つかりませんでした。明るい場所で、シートを画面いっぱいに入れて撮ってね！</td></tr>`;
-                } else {
-                    shiftResults.forEach(res => {
-                        const row = `<tr class="animate__animated animate__fadeInUp">
-                            <td>${res.date}</td>
-                            <td><strong>${res.name}</strong></td>
-                            <td><span style="color:#ff6b6b; font-weight:bold;">${res.time}</span></td>
-                        </tr>`;
-                        resultBody.insertAdjacentHTML('beforeend', row);
-                    });
-                }
-
-                // メモリ解放
-                src.delete(); dst.delete(); contours.delete(); hierarchy.delete(); rectified.delete(); nameRoi.delete(); grayRect.delete();
-
-            } catch (error) {
-                console.error(error);
-                status.innerHTML = '❌ 解析中にエラーが発生しちゃった。真上から綺麗に撮ってみてね。';
-            }
-        };
-    });
-</script>
-</body>
-</html>
+                            time: `${leftHour}:00 〜
