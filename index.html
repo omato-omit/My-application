@@ -1,5 +1,3 @@
-<!DOCTYPE html>
-<html lang="ja">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -305,4 +303,35 @@
                         shiftResults.push({
                             date: `${day + 1}日`,
                             name: detectedName,
-                            time: `${leftHour}:00 〜
+                            time: `${leftHour}:00 〜 ${rightHour}:00`
+                        });
+                    }
+                }
+
+                status.innerHTML = '🎉 解析完了！ 🎉';
+                resultTable.style.display = 'table';
+                
+                if(shiftResults.length === 0) {
+                    resultBody.innerHTML = `<tr><td colspan="3">記号がうまく見つからなかったよ。写真を明るくして試してみてね！</td></tr>`;
+                } else {
+                    shiftResults.forEach(res => {
+                        const row = `<tr class="animate__animated animate__fadeInUp">
+                            <td>${res.date}</td>
+                            <td><strong>${res.name}</strong></td>
+                            <td><span style="color:#ff6b6b; font-weight:bold;">${res.time}</span></td>
+                        </tr>`;
+                        resultBody.insertAdjacentHTML('beforeend', row);
+                    });
+                }
+
+                src.delete(); dst.delete(); contours.delete(); hierarchy.delete(); rectified.delete(); nameRoi.delete(); grayRect.delete();
+
+            } catch (error) {
+                console.error(error);
+                status.innerHTML = '❌ エラーが発生しちゃった。写真をもう一度選んでみてね。';
+            }
+        };
+    });
+</script>
+</body>
+</html>
