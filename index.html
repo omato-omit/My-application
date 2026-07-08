@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>✨ 魔法のシフト読み込みくん ✨</title>
+    
+    <script src="https://docs.opencv.org/4.5.4/opencv.js" defer></script>
+    <script src="https://unpkg.com/tesseract.js@v2.1.0/dist/tesseract.min.js"></script>
+    
+    <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
+
+    <style>
+        :root {
+            --primary-color: #ff6b6b;
+            --secondary-color: #feca57;
+            --bg-color: #ffeffd;
+        }
+
+        body {
+            font-family: 'M+ PLUS Rounded 1c', sans-serif;
+            background: linear-gradient(135deg, #fff5f5 0%, #fff0f5 100%);
+            color: #4a4a4a;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .container {
+            max-width: 600px;
+            width: 100%;
+            background: white;
+            padding: 30px;
+            border-radius: 30px;
+            box-shadow: 0 10px 30px rgba(255, 107, 107, 0.2);
+            border: 4px dashed #ff9ff3;
+            text-align: center;
+            box-sizing: border-box;
+        }
+
+        h1 {
+            color: var(--primary-color);
+            font-size: 2rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 0px #fff, 4px 4px 0px #ffccd5;
+        }
+
+        .subtitle {
+            font-size: 0.9rem;
+            color: #888;
+            margin-bottom: 30px;
+        }
+
+        /* 派手で可愛いボタン */
+        .file-input-wrapper {
+            position: relative;
+            overflow: hidden;
+            display: inline-block;
+            margin-bottom: 20px;
+        }
+
+        .btn-upload {
+            background: linear-gradient(45deg, #ff6b6b, #ff9ff3);
+            color: white;
+            padding: 15px 40px;
+            border-radius: 50px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 5px 15px rgba(255, 107, 107, 0.4);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .btn-upload:hover {
+            transform: scale(1.05) rotate(-1deg);
+            box-shadow: 0 8px 20px rgba(255, 107, 107, 0.6);
+        }
+
+        input[type=file] {
+            position: absolute;
+            left: 0;
+            top: 0;
+            opacity: 0;
+            font-size: 100px;
+            cursor: pointer;
+        }
+
+        #preview {
+            max-width: 100%;
+            border-radius: 15px;
+            margin-top: 20px;
+            display: none;
+            border: 3px solid #feca57;
+        }
+
+        /* 結果表示エリア */
+        #status {
+            margin: 20px 0;
+            font-weight: bold;
+            color: #ff6b6b;
+        }
+
+        .result-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            display: none;
+        }
+
+        .result-table th, .result-table td {
+            border: 2px solid #ffe0e6;
+            padding: 12px;
+            text-align: center;
+        }
+
+        .result-table th {
+            background-color: #fff0f2;
+            color: #ff6b6b;
+        }
+
+        .result-table tr:nth-child(even) {
+            background-color: #fff9fa;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container animate__animated animate__fadeIn">
+    <h1 class="animate__animated animate__bounceIn">✨ シフト読み込みくん ✨</h1>
+    <p class="subtitle">写真をパシャッと撮るだけで、誰がいつ入れるか自動判別！</p>
+
+    <div class="file-input-wrapper">
+        <button class="btn-upload">📸 シフト写真を選択</button>
+        <input type="file" id="imageInput" accept="image/*">
+    </div>
+
+    <div id="status">画像を選んでね！</div>
+    <img id="preview" alt="プレビュー">
+
+    <table class="result-table" id="resultTable">
+        <thead>
+            <tr>
+                <th>日付</th>
+                <th>名前</th>
+                <th>勤務可能時間</th>
+            </tr>
+        </thead>
+        <tbody id="resultBody">
+            </tbody>
+    </table>
+</div>
+
+<script>
+    const imageInput = document.getElementById('imageInput');
+    const preview = document.getElementById('preview');
+    const status = document.getElementById('status');
+    const resultTable = document.getElementById('resultTable');
+    const resultBody = document.getElementById('resultBody');
+
+    imageInput.addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        // プレビュー表示
+        preview.src = URL.createObjectURL(file);
+        preview.style.display = 'inline-block';
+        status.innerHTML = '🔮 読み込み中... がんばって解析してるよ！ 🔮';
+        resultTable.style.display = 'none';
+        resultBody.innerHTML = '';
+
+        // Tesseract.jsを使った簡易OCR処理 (OpenCV.jsと組み合わせて本来は前処理をしますが、ここではブラウザ単体で動くデモとしてOCRをメインに処理します)
+        Tesseract.recognize(
+            file,
+            'jpn', // 日本語＋英語
+            { logger: m => console.log(m) }
+        ).then(({ data: { text } }) => {
+            status.innerHTML = '🎉 解析完了！ 🎉';
+            resultTable.style.display = 'table';
+            
+            // 擬似的にテキストから「名前」「日付」「< >」のロジックを抽出するデモ処理
+            // 本格的な解析には、文字の位置情報(bbox)と「<>」の画像認識を組み合わせます
+            parseShiftText(text);
+        }).catch(err => {
+            console.error(err);
+            status.innerHTML = '❌ 読み込みに失敗しちゃった...もう一度試してね。';
+        });
+    });
+
+    // テキストから「誰が」「何時に」をパースするロジック（簡易版）
+    function parseShiftText(text) {
+        // デモ用に、OCRで読み取ったっぽい文章から強引に「<時間>」や「名前」っぽいものを探すサンプル
+        // 実際のシフトの並び（行・列）に応じて、ここをチューニングしていきます
+        
+        // テスト用のダミーデータ（実際はここにOCRやOpenCVの解析結果が入ります）
+        const mockResults = [
+            { date: "7月10日", name: "たろう", time: "10:00 〜 17:00 (< >認識)" },
+            { date: "7月10日", name: "はなこ", time: "13:00 〜 22:00 (< >認識)" },
+            { date: "7月11日", name: "じろう", time: "09:00 〜 15:00 (< >認識)" }
+        ];
+
+        mockResults.forEach(res => {
+            const row = `<tr>
+                <td>${res.date}</td>
+                <td><strong>${res.name}</strong></td>
+                <td><span style="color:#ff6b6b;">${res.time}</span></td>
+            </tr>`;
+            resultBody.insertAdjacentHTML('beforeend', row);
+        });
+    }
+</script>
+</body>
+</html>
